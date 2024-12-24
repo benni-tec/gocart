@@ -1,8 +1,8 @@
 package test
 
 import (
-	"gocart/gocart"
-	"gocart/gotrac"
+	"github.com/benni-tec/gocart/gocart"
+	"github.com/benni-tec/gocart/gotrac"
 	"net/http"
 	"testing"
 )

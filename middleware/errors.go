@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"context"
-	"gocart/utils"
+	"github.com/benni-tec/gocart/utils"
 )
 
 var errorCache = utils.NewCache[[]error]()

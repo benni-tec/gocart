@@ -1,7 +1,7 @@
 package gocart
 
 import (
-	"gocart/gotrac"
+	"github.com/benni-tec/gocart/gotrac"
 	"net/http"
 )
 

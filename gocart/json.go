@@ -2,7 +2,7 @@ package gocart
 
 import (
 	"encoding/json"
-	"gocart/gotrac"
+	"github.com/benni-tec/gocart/gotrac"
 	"net/http"
 )
 

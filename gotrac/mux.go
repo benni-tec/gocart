@@ -1,10 +1,10 @@
 package gotrac
 
 import (
+	"github.com/benni-tec/gocart/middleware"
 	"github.com/go-chi/chi/v5"
 	swg "github.com/swaggest/swgui"
 	swgui "github.com/swaggest/swgui/v5emb"
-	"gocart/middleware"
 	"net/http"
 )
 

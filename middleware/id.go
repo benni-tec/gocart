@@ -2,8 +2,8 @@ package middleware
 
 import (
 	"context"
+	"github.com/benni-tec/gocart/utils"
 	"github.com/google/uuid"
-	"gocart/utils"
 	"net/http"
 )
 

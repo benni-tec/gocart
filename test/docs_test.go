@@ -2,7 +2,7 @@ package test
 
 import (
 	"encoding/json"
-	"gocart/gotrac"
+	"github.com/benni-tec/gocart/gotrac"
 	"net/http"
 	"testing"
 )

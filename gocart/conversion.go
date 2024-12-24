@@ -1,8 +1,8 @@
 package gocart
 
 import (
-	"gocart/gotrac"
-	"gocart/middleware"
+	"github.com/benni-tec/gocart/gotrac"
+	"github.com/benni-tec/gocart/middleware"
 	"io"
 	"net/http"
 )

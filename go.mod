@@ -1,4 +1,4 @@
-module gocart
+module github.com/benni-tec/gocart
 
 go 1.23
 

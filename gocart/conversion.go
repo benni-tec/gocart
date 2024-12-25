@@ -28,7 +28,7 @@ type cartImpl[TInput any, TOutput any] struct {
 	handler CartFunc[TInput, TOutput]
 }
 
-func WithConversion[TInput any, TOutput any](input Converter[TInput], output Converter[TOutput], h CartFunc[TInput, TOutput]) Cart {
+func IO[TInput any, TOutput any](input Converter[TInput], output Converter[TOutput], h CartFunc[TInput, TOutput]) Cart {
 	return &cartImpl[TInput, TOutput]{
 		input:   input,
 		output:  output,
@@ -42,17 +42,38 @@ func WithConversion[TInput any, TOutput any](input Converter[TInput], output Con
 	}
 }
 
+func I[TInput any](input Converter[TInput], h CartFunc[TInput, any]) Cart {
+	return IO(input, nil, h)
+}
+
+func O[TOutput any](output Converter[TOutput], h CartFunc[any, TOutput]) Cart {
+	return IO(nil, output, h)
+}
+
+func A(h CartFunc[any, any]) Cart {
+	return IO(nil, nil, h)
+}
+
 func (cart *cartImpl[TInput, TOutput]) Info() *gotrac.HandlerInformation {
 	info := cart.info
-	return &gotrac.HandlerInformation{
+
+	handler := &gotrac.HandlerInformation{
 		Information: gotrac.Information{
 			Summary:     info.summary,
 			Description: info.description,
 		},
-		Input:  cart.input.Type(),
-		Output: cart.output.Type(),
 		Hidden: info.hidden,
 	}
+
+	if cart.input != nil {
+		handler.Input = cart.input.Type()
+	}
+
+	if cart.output != nil {
+		handler.Output = cart.output.Type()
+	}
+
+	return handler
 }
 
 func (cart *cartImpl[TInput, TOutput]) WithInfo(fn func(info *CartInformation)) Cart {

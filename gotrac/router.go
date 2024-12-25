@@ -2,7 +2,6 @@ package gotrac
 
 import (
 	"github.com/go-chi/chi/v5"
-	swg "github.com/swaggest/swgui"
 	"net/http"
 )
 
@@ -46,11 +45,7 @@ type Router interface {
 	// not allowed.
 	MethodNotAllowed(h http.HandlerFunc)
 
-	WithDocs(pattern string, generator Generator)
-	WithSwaggerUI(pattern string, docPattern string, title string, config *swg.Config)
-
 	// ++++ Information ++++
-	RouterInformation
-	WithSummary(summary string) Router
-	WithDescription(description string) Router
+	Info() *RouterInformation
+	WithInfo(fn func(info *RouterInformation)) Router
 }

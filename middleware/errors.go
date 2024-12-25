@@ -3,27 +3,28 @@ package middleware
 import (
 	"context"
 	"github.com/benni-tec/gocart/utils"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 var errorCache = utils.NewCache[[]error]()
 
 type Errors interface {
-	ContextWithId
+	Id() string
 	Errors() []error
 	AddError(err error)
 }
 
-func ContextWithErrors(ctx context.Context) Errors {
-	withId := Context(ctx)
-	return WithErrors(withId)
-}
-
-func WithErrors(ctx ContextWithId) Errors {
-	return &errorsImpl{ContextWithId: ctx}
+func GetErrors(ctx context.Context) Errors {
+	withId := middleware.GetReqID(ctx)
+	return &errorsImpl{id: withId}
 }
 
 type errorsImpl struct {
-	ContextWithId
+	id string
+}
+
+func (e *errorsImpl) Id() string {
+	return e.id
 }
 
 func (c *errorsImpl) Errors() []error {

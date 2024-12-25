@@ -1,7 +1,8 @@
-package gotrac
+package gocrew
 
 import (
 	"errors"
+	"github.com/benni-tec/gocart/gotrac"
 	"github.com/go-chi/chi/v5"
 	"github.com/swaggest/openapi-go/openapi31"
 	"path"
@@ -10,7 +11,7 @@ import (
 )
 
 type Generator interface {
-	Generate(router Router) (*openapi31.Spec, error)
+	Generate(router gotrac.Router) (*Spec, error)
 }
 
 type generatorImpl struct {
@@ -25,18 +26,19 @@ func NewGenerator() Generator {
 	}
 }
 
-func (g *generatorImpl) Generate(router Router) (*openapi31.Spec, error) {
+func (g *generatorImpl) Generate(router gotrac.Router) (*Spec, error) {
 	paths, err := g.genRoutes(router)
 	if err != nil {
 		return nil, err
 	}
 
-	return &openapi31.Spec{
+	info := router.Info()
+	return &Spec{
 		Openapi: "3.1",
 		Info: openapi31.Info{
-			Title:       router.Summary(),
-			Summary:     P(router.Summary()),
-			Description: P(router.Description()),
+			Title:       info.Summary,
+			Summary:     gotrac.P(info.Summary),
+			Description: gotrac.P(info.Description),
 		},
 		JSONSchemaDialect: nil,
 		Servers:           nil,
@@ -50,7 +52,7 @@ func (g *generatorImpl) Generate(router Router) (*openapi31.Spec, error) {
 	}, nil
 }
 
-func (g *generatorImpl) genRoutes(router Router) (*openapi31.Paths, error) {
+func (g *generatorImpl) genRoutes(router gotrac.Router) (*openapi31.Paths, error) {
 	paths := &openapi31.Paths{
 		MapOfPathItemValues: make(map[string]openapi31.PathItem),
 		MapOfAnything:       make(map[string]interface{}),
@@ -95,23 +97,23 @@ func (g *generatorImpl) genRoute(paths *openapi31.Paths, prefix string, route ch
 			MapOfAnything: nil,
 		}
 
-		if typed, ok := handler.(Handler); ok {
+		if typed, ok := handler.(gotrac.Handler); ok {
 			info := typed.Info()
 
-			if info.Hidden() {
+			if info.Hidden {
 				continue
 			}
 
-			operation.Summary = P(info.Summary())
-			operation.Description = P(info.Description())
+			operation.Summary = gotrac.P(info.Summary)
+			operation.Description = gotrac.P(info.Description)
 
-			request, err := g.requestBody(info.Input())
+			request, err := g.requestBody(info.Input)
 			if err != nil {
 				return err
 			}
 			operation.RequestBody = request
 
-			response, err := g.responseBody(info.Output())
+			response, err := g.responseBody(info.Output)
 			if err != nil {
 				return err
 			}
@@ -168,7 +170,7 @@ func (g *generatorImpl) genRoute(paths *openapi31.Paths, prefix string, route ch
 	return nil
 }
 
-func (gen *generatorImpl) requestBody(typ *HandlerType) (*openapi31.RequestBodyOrReference, error) {
+func (gen *generatorImpl) requestBody(typ *gotrac.HandlerType) (*openapi31.RequestBodyOrReference, error) {
 	if typ == nil {
 		return nil, nil
 	}
@@ -195,7 +197,7 @@ func (gen *generatorImpl) requestBody(typ *HandlerType) (*openapi31.RequestBodyO
 	}, nil
 }
 
-func (gen *generatorImpl) responseBody(typ *HandlerType) (*openapi31.ResponseOrReference, error) {
+func (gen *generatorImpl) responseBody(typ *gotrac.HandlerType) (*openapi31.ResponseOrReference, error) {
 	if typ == nil {
 		return nil, nil
 	}

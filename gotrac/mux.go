@@ -1,24 +1,25 @@
 package gotrac
 
 import (
-	"github.com/benni-tec/gocart/middleware"
 	"github.com/go-chi/chi/v5"
-	swg "github.com/swaggest/swgui"
-	swgui "github.com/swaggest/swgui/v5emb"
+	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 )
 
 type Mux struct {
 	router chi.Router
-
-	summary     string
-	description string
+	info   RouterInformation
 }
 
 // Default creates a new Router and adds the IdMiddleware required for error handling
 func Default() Router {
+	mux := NewRouter()
+	mux.Use(middleware.RequestID)
+	return mux
+}
+
+func NewRouter() Router {
 	mux := wrapToRouter(chi.NewRouter())
-	mux.Use(middleware.IdMiddleware)
 	return mux
 }
 
@@ -57,15 +58,24 @@ func (m *Mux) With(middlewares ...func(http.Handler) http.Handler) Router {
 }
 
 func (m *Mux) Group(fn func(r Router)) Router {
-	return wrapToRouter(m.router.Group(func(r chi.Router) {
-		fn(wrapToRouter(m.router))
-	}))
+	inline := m.With()
+
+	if fn != nil {
+		fn(inline)
+	}
+
+	return inline
 }
 
 func (m *Mux) Route(pattern string, fn func(r Router)) Router {
-	return wrapToRouter(m.router.Route(pattern, func(r chi.Router) {
-		fn(wrapToRouter(m.router))
-	}))
+	sub := NewRouter()
+
+	if fn != nil {
+		fn(sub)
+	}
+
+	m.Mount(pattern, sub)
+	return sub
 }
 
 func (m *Mux) Mount(pattern string, h http.Handler) {
@@ -104,45 +114,16 @@ func (m *Mux) MethodNotAllowed(h http.HandlerFunc) {
 	m.router.MethodNotAllowed(h)
 }
 
-// +++ Docs +++
-
-func (m *Mux) WithDocs(pattern string, generator Generator) {
-	docs, err := generator.Generate(m)
-	if err != nil {
-		panic(err)
-	}
-
-	m.router.Method(http.MethodGet, pattern, specHandler(docs))
-}
-
-func (m *Mux) WithSwaggerUI(pattern string, docPattern string, title string, config *swg.Config) {
-	var handler http.Handler
-	if config != nil {
-		ui := swgui.NewWithConfig(*config)
-		handler = ui(title, docPattern, pattern)
-	} else {
-		handler = swgui.New(title, docPattern, pattern)
-	}
-
-	m.Mount(pattern, handler)
-}
-
 // +++ Information +++
 
-func (m *Mux) Summary() string {
-	return m.summary
+func (m *Mux) Info() *RouterInformation {
+	return &m.info
 }
 
-func (m *Mux) Description() string {
-	return m.description
-}
+func (m *Mux) WithInfo(fn func(info *RouterInformation)) Router {
+	if fn != nil {
+		fn(&m.info)
+	}
 
-func (m *Mux) WithSummary(title string) Router {
-	m.summary = title
-	return m
-}
-
-func (m *Mux) WithDescription(description string) Router {
-	m.description = description
 	return m
 }

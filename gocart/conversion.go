@@ -7,14 +7,12 @@ import (
 	"net/http"
 )
 
-type HandlerWithConversion interface {
+type Cart interface {
 	gotrac.Handler
-	WithSummary(summary string) HandlerWithConversion
-	WithDescription(description string) HandlerWithConversion
-	WithHidden(hidden bool) HandlerWithConversion
+	WithInfo(fn func(info *CartInformation)) Cart
 }
 
-type HandlerFunc[TInput any, TOutput any] func(request *Request[TInput], writer HeaderWriter) (*TOutput, error)
+type CartFunc[TInput any, TOutput any] func(request *Request[TInput], writer HeaderWriter) (*TOutput, error)
 
 type Converter[T any] interface {
 	Serialize(body *T, headers http.Header) ([]byte, error)
@@ -22,66 +20,82 @@ type Converter[T any] interface {
 	Type() *gotrac.HandlerType
 }
 
-type conversionHandler[TInput any, TOutput any] struct {
+type cartImpl[TInput any, TOutput any] struct {
+	info   CartInformation
 	input  Converter[TInput]
 	output Converter[TOutput]
 
-	handler HandlerFunc[TInput, TOutput]
-
-	summary     string
-	description string
-	hidden      bool
+	handler CartFunc[TInput, TOutput]
 }
 
-func WithConversion[TInput any, TOutput any](input Converter[TInput], output Converter[TOutput], h HandlerFunc[TInput, TOutput]) HandlerWithConversion {
-	return &conversionHandler[TInput, TOutput]{
+func WithConversion[TInput any, TOutput any](input Converter[TInput], output Converter[TOutput], h CartFunc[TInput, TOutput]) Cart {
+	return &cartImpl[TInput, TOutput]{
 		input:   input,
 		output:  output,
 		handler: h,
 
-		summary:     "",
-		description: "",
-		hidden:      false,
+		info: CartInformation{
+			summary:     "",
+			description: "",
+			hidden:      false,
+		},
 	}
 }
 
-func (actor *conversionHandler[TInput, TOutput]) Info() gotrac.HandlerInformation {
-	return actor
+func (cart *cartImpl[TInput, TOutput]) Info() *gotrac.HandlerInformation {
+	info := cart.info
+	return &gotrac.HandlerInformation{
+		Information: gotrac.Information{
+			Summary:     info.summary,
+			Description: info.description,
+		},
+		Input:  cart.input.Type(),
+		Output: cart.output.Type(),
+		Hidden: info.hidden,
+	}
 }
 
-func (actor *conversionHandler[TInput, TOutput]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	setTypes(w.Header(), "Accepts", actor.input.Type().HttpType)
-	setTypes(w.Header(), "Content-Type", actor.output.Type().HttpType)
+func (cart *cartImpl[TInput, TOutput]) WithInfo(fn func(info *CartInformation)) Cart {
+	if fn != nil {
+		fn(&cart.info)
+	}
 
-	ctx := middleware.ContextWithErrors(r.Context())
+	return cart
+}
+
+func (cart *cartImpl[TInput, TOutput]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	setTypes(w.Header(), "Accepts", cart.input.Type().HttpType)
+	setTypes(w.Header(), "Content-Type", cart.output.Type().HttpType)
+
+	errors := middleware.GetErrors(r.Context())
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		ctx.AddError(err)
+		errors.AddError(err)
 		return
 	}
 
-	input, err := actor.input.Deserialize(body, r.Header)
+	input, err := cart.input.Deserialize(body, r.Header)
 	if err != nil {
-		ctx.AddError(err)
+		errors.AddError(err)
 		return
 	}
 
-	output, err := actor.handler(ConvertRequest(r, input), w)
+	output, err := cart.handler(ConvertRequest(r, input), w)
 	if err != nil {
-		ctx.AddError(err)
+		errors.AddError(err)
 		return
 	}
 
-	body, err = actor.output.Serialize(output, w.Header())
+	body, err = cart.output.Serialize(output, w.Header())
 	if err != nil {
-		ctx.AddError(err)
+		errors.AddError(err)
 		return
 	}
 
 	_, err = w.Write(body)
 	if err != nil {
-		ctx.AddError(err)
+		errors.AddError(err)
 		return
 	}
 }
@@ -96,37 +110,23 @@ func setTypes(header http.Header, key string, values []string) {
 
 // +++ Information +++
 
-func (actor *conversionHandler[TInput, TOutput]) Summary() string {
-	return actor.summary
+type CartInformation struct {
+	summary     string
+	description string
+	hidden      bool
 }
 
-func (actor *conversionHandler[TInput, TOutput]) Description() string {
-	return actor.description
-}
-
-func (actor *conversionHandler[TInput, TOutput]) Input() *gotrac.HandlerType {
-	return actor.input.Type()
-}
-
-func (actor *conversionHandler[TInput, TOutput]) Output() *gotrac.HandlerType {
-	return actor.output.Type()
-}
-
-func (actor *conversionHandler[TInput, TOutput]) Hidden() bool {
-	return actor.hidden
-}
-
-func (actor *conversionHandler[TInput, TOutput]) WithSummary(summary string) HandlerWithConversion {
+func (actor *CartInformation) WithSummary(summary string) *CartInformation {
 	actor.summary = summary
 	return actor
 }
 
-func (actor *conversionHandler[TInput, TOutput]) WithDescription(description string) HandlerWithConversion {
+func (actor *CartInformation) WithDescription(description string) *CartInformation {
 	actor.description = description
 	return actor
 }
 
-func (actor *conversionHandler[TInput, TOutput]) WithHidden(hidden bool) HandlerWithConversion {
+func (actor *CartInformation) WithHidden(hidden bool) *CartInformation {
 	actor.hidden = hidden
 	return actor
 }

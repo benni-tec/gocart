@@ -34,7 +34,7 @@ func (g *generatorImpl) Generate(router gotrac.Router) (*Spec, error) {
 
 	info := router.Info()
 	return &Spec{
-		Openapi: "3.1",
+		Openapi: "3.1.0",
 		Info: openapi31.Info{
 			Title:       info.Summary,
 			Summary:     gotrac.P(info.Summary),

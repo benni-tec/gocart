@@ -2,6 +2,8 @@ package gotrac
 
 import "net/http"
 
+// Route is a handler that has been registered to a Router.
+// When registering with a Router any handler is wrapped to a Route therefore allowing the information to be edited.
 type Route interface {
 	Handler
 	WithInfo(fn func(route *RouteInformation)) Route
@@ -40,8 +42,6 @@ func wrapFuncToHandler(handler http.HandlerFunc) *routeImpl {
 	}
 }
 
-// Handler
-
 func (a *routeImpl) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	a.handler(writer, request)
 }
@@ -50,8 +50,6 @@ func (a *routeImpl) Info() *HandlerInformation {
 	cast := HandlerInformation(a.info)
 	return &cast
 }
-
-// HandlerInformation: get data
 
 func (a *routeImpl) WithInfo(fn func(route *RouteInformation)) Route {
 	if fn != nil {

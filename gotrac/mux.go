@@ -1,23 +1,31 @@
 package gotrac
 
 import (
+	middleware2 "github.com/benni-tec/gocart/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 )
 
+// Mux implements the Router using a chi.Router
 type Mux struct {
 	router chi.Router
 	info   RouterInformation
 }
 
-// Default creates a new Router and adds the IdMiddleware required for error handling
+// Default creates a new Router and adds common middlewares, that should be present on the root router
 func Default() Router {
 	mux := NewRouter()
+	mux.Use(middleware.RedirectSlashes)
+	mux.Use(middleware.Logger)
 	mux.Use(middleware.RequestID)
+	mux.Use(middleware.Recoverer)
+	mux.Use(middleware2.ErrorMiddleware)
+
 	return mux
 }
 
+// NewRouter creates a new Router without any middlewares.
 func NewRouter() Router {
 	mux := wrapToRouter(chi.NewRouter())
 	return mux

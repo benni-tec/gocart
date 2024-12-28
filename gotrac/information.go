@@ -1,5 +1,6 @@
 package gotrac
 
+// Information contains the basic fields which can be set on most objects
 type Information struct {
 	Summary     string
 	Description string
@@ -15,6 +16,7 @@ func (c *Information) WithDescription(description string) *Information {
 	return c
 }
 
+// RouterInformation contains the information that can be set on a router
 type RouterInformation struct {
 	Information
 }
@@ -29,6 +31,9 @@ func (c *RouterInformation) WithDescription(description string) *RouterInformati
 	return c
 }
 
+// HandlerInformation contains the information that can be set for a handler.
+// This is only readable since handler can be anything provided to gotrac.
+// Once the handler is registered with a Router a Route is returned where the information can be edited.
 type HandlerInformation struct {
 	Information
 	Input  *HandlerType
@@ -36,6 +41,8 @@ type HandlerInformation struct {
 	Hidden bool
 }
 
+// RouteInformation contains the information that can be set on a route.
+// This is the same as HandlerInformation, but is also writeable.
 type RouteInformation HandlerInformation
 
 func (c *RouteInformation) WithSummary(summary string) *RouteInformation {

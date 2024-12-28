@@ -9,7 +9,7 @@ import (
 )
 
 func TestDocs(t *testing.T) {
-	gen := gocrew.NewGenerator()
+	gen := gocrew.OpenApi31()
 	router := gotrac.Default().WithInfo(func(info *gotrac.RouterInformation) {
 		info.WithSummary("Fotobox Firmware (Backend)").
 			WithDescription("some kind of description")

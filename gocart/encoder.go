@@ -22,11 +22,16 @@ func NewHeaderEncoder(writer http.ResponseWriter) Encoder {
 }
 
 func (enc *HeaderEncoder) Encode(value reflect.Value, field reflect.StructField) error {
+	name, ok := field.Tag.Lookup("header")
+	if !ok {
+		return nil
+	}
+
 	strs, err := EncodePrimitives(value)
 	if err != nil {
 		return err
 	}
 
-	enc.headers.Set(field.Name, strings.Join(strs, ","))
+	enc.headers.Set(name, strings.Join(strs, ","))
 	return nil
 }

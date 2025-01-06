@@ -2,16 +2,14 @@ package gocrew
 
 import (
 	"encoding/json"
-	"errors"
-	"github.com/benni-tec/gocart/gotrac"
+	"github.com/benni-tec/gocart/goflag"
 	"github.com/go-chi/chi/v5"
+	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi31"
 	swg "github.com/swaggest/swgui"
 	swgui "github.com/swaggest/swgui/v5emb"
 	"net/http"
-	"path"
 	"reflect"
-	"strings"
 )
 
 // +++ Spec +++
@@ -40,297 +38,102 @@ func (spec *OpenApi31Spec) WithUI(title string, basePath string, docPattern stri
 // +++ Generator +++
 
 type openapi31Generator struct {
-	reflector        *openapi31.Reflector
+	title            string
+	defaultTag       openapi31.Tag
 	defaultResponses map[string]openapi31.ResponseOrReference
 }
 
-func (g *openapi31Generator) Generate(router gotrac.Router) (*OpenApi31Spec, error) {
-	paths, err := g.genRoutes(router)
-	if err != nil {
-		return nil, err
+func (gen *openapi31Generator) Generate(router chi.Routes) (*OpenApi31Spec, error) {
+	reflector := openapi31.NewReflector()
+	reflector.Spec = &openapi31.Spec{Openapi: "3.1.0"}
+
+	if r, ok := router.(goflag.InformationFlag); ok {
+		reflector.Spec.Info.
+			WithSummary(r.Info().Summary).
+			WithDescription(r.Info().Description)
 	}
 
-	info := router.Info()
-	return &OpenApi31Spec{
-		Openapi: "3.1.0",
-		Info: openapi31.Info{
-			Title:       info.Summary,
-			Summary:     gotrac.P(info.Summary),
-			Description: gotrac.P(info.Description),
-		},
-		JSONSchemaDialect: nil,
-		Servers:           nil,
-		Paths:             paths,
-		Webhooks:          nil,
-		Components:        nil,
-		Security:          nil,
-		Tags:              nil,
-		ExternalDocs:      nil,
-		MapOfAnything:     nil,
-	}, nil
-}
+	reflector.Spec.Info.WithTitle(gen.title)
 
-func (g *openapi31Generator) genRoutes(router gotrac.Router) (*openapi31.Paths, error) {
-	operations := make(map[string]map[string]*openapi31.Operation)
-	err := chi.Walk(router, func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
-		typed, isTyped := handler.(gotrac.Handler)
-		if !isTyped {
-			return nil
-		}
+	hasDefaultTag := false
 
-		info := typed.Info()
-		if info.Hidden {
-			return nil
-		}
-
-		operation := &openapi31.Operation{
-			Summary:     gotrac.P(info.Summary),
-			Description: gotrac.P(info.Description),
-		}
-
-		request, err := g.requestBody(info.Input)
-		if err != nil {
-			return err
-		}
-		operation.RequestBody = request
-
-		response, err := g.responseBody(info.Output)
-		if err != nil {
-			return err
-		}
-		operation.Responses = &openapi31.Responses{
-			Default:                        response,
-			MapOfResponseOrReferenceValues: g.defaultResponses,
-			MapOfAnything:                  nil,
-		}
-
-		// ensure map has key
-		_, ok := operations[route]
-		if !ok {
-			operations[route] = make(map[string]*openapi31.Operation)
-		}
-
-		operations[route][method] = operation
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	paths := &openapi31.Paths{
-		MapOfPathItemValues: make(map[string]openapi31.PathItem),
-		MapOfAnything:       make(map[string]interface{}),
-	}
-
-	for route, x := range operations {
-		item := openapi31.PathItem{}
-
-		for method, operation := range x {
-			switch strings.ToUpper(method) {
-			case "GET":
-				item.Get = operation
-				break
-			case "PUT":
-				item.Put = operation
-				break
-			case "POST":
-				item.Post = operation
-				break
-			case "DELETE":
-				item.Delete = operation
-				break
-			case "OPTIONS":
-				item.Options = operation
-				break
-			case "HEAD":
-				item.Head = operation
-				break
-			case "PATCH":
-				item.Patch = operation
-				break
-			case "TRACE":
-				item.Trace = operation
-				break
-			case "CONNECT", "*":
-				continue
-			default:
-				return nil, errors.New("unknown method: " + method)
+	err := Walk(
+		router,
+		func(method string, route string, handler http.Handler, controller goflag.ControllerFlag) error {
+			ctx, err := reflector.NewOperationContext(method, route)
+			if err != nil {
+				return err
 			}
-		}
 
-		paths.MapOfPathItemValues[route] = item
-	}
+			typed, isTyped := handler.(goflag.EndpointFlag)
+			if !isTyped {
+				return nil
+			}
 
-	return paths, nil
-}
-
-func (g *openapi31Generator) genRoute(paths *openapi31.Paths, prefix string, route chi.Route) error {
-	pattern := path.Join(prefix, route.Pattern)
-
-	item := openapi31.PathItem{
-		Summary:       nil,
-		Description:   nil,
-		Servers:       nil,
-		Parameters:    nil,
-		MapOfAnything: make(map[string]interface{}),
-	}
-
-	// this routes handlers
-	for method, handler := range route.Handlers {
-		operation := &openapi31.Operation{
-			ExternalDocs:  nil,
-			ID:            nil,
-			Tags:          nil,
-			Summary:       nil,
-			Description:   nil,
-			Parameters:    nil,
-			RequestBody:   nil,
-			Responses:     nil,
-			Callbacks:     nil,
-			Deprecated:    nil,
-			Security:      nil,
-			Servers:       nil,
-			MapOfAnything: nil,
-		}
-
-		if typed, ok := handler.(gotrac.Handler); ok {
 			info := typed.Info()
-
 			if info.Hidden {
-				continue
+				return nil
 			}
 
-			operation.Summary = gotrac.P(info.Summary)
-			operation.Description = gotrac.P(info.Description)
-
-			request, err := g.requestBody(info.Input)
-			if err != nil {
-				return err
+			var tag string
+			if controller != nil {
+				tag = controller.Info().Name
+			} else {
+				hasDefaultTag = true
+				tag = gen.defaultTag.Name
 			}
-			operation.RequestBody = request
 
-			response, err := g.responseBody(info.Output)
-			if err != nil {
-				return err
+			ctx.SetSummary(info.Summary)
+			ctx.SetDescription(info.Description)
+			ctx.SetTags(tag)
+
+			// schemas
+			// TODO: set proper contentType
+			if info.Input != nil {
+				dummy := reflect.New(info.Input.GoType).Interface()
+
+				if len(info.Input.HttpType) == 0 {
+					ctx.AddReqStructure(dummy, openapi.WithHTTPStatus(http.StatusNoContent))
+				}
+
+				for _, typ := range info.Input.HttpType {
+					ctx.AddReqStructure(dummy, openapi.WithContentType(typ))
+				}
 			}
-			operation.Responses = &openapi31.Responses{
-				Default:                        response,
-				MapOfResponseOrReferenceValues: g.defaultResponses,
-				MapOfAnything:                  nil,
+
+			if info.Output != nil {
+				dummy := reflect.New(info.Output.GoType).Interface()
+
+				if len(info.Output.HttpType) == 0 {
+					ctx.AddRespStructure(dummy, openapi.WithHTTPStatus(http.StatusNoContent))
+				}
+
+				for _, typ := range info.Output.HttpType {
+					ctx.AddRespStructure(dummy, openapi.WithContentType(typ))
+				}
 			}
-		}
 
-		switch strings.ToUpper(method) {
-		case "GET":
-			item.Get = operation
-			break
-		case "PUT":
-			item.Put = operation
-			break
-		case "POST":
-			item.Post = operation
-			break
-		case "DELETE":
-			item.Delete = operation
-			break
-		case "OPTIONS":
-			item.Options = operation
-			break
-		case "HEAD":
-			item.Head = operation
-			break
-		case "PATCH":
-			item.Patch = operation
-			break
-		case "TRACE":
-			item.Trace = operation
-			break
-		case "CONNECT", "*":
-			continue
-		default:
-			return errors.New("unknown method: " + method)
-		}
-	}
-
-	paths.MapOfPathItemValues[pattern] = item
-
-	// recursive sub routes
-	if route.SubRoutes != nil {
-		for _, subroute := range route.SubRoutes.Routes() {
-			if err := g.genRoute(paths, pattern, subroute); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func (gen *openapi31Generator) requestBody(typ *gotrac.HandlerType) (*openapi31.RequestBodyOrReference, error) {
-	if typ == nil {
-		return nil, nil
-	}
-
-	spec, err := gen.reflector.Reflect(reflect.New(typ.GoType).Interface())
-	if err != nil {
-		return nil, err
-	}
-
-	schema, err := structToMap(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	content := map[string]openapi31.MediaType{}
-	for _, mime := range typ.HttpType {
-		content[mime] = openapi31.MediaType{
-			Schema: schema,
-		}
-	}
-
-	return &openapi31.RequestBodyOrReference{
-		RequestBody: &openapi31.RequestBody{
-			Description:   nil,
-			Content:       content,
-			Required:      nil,
-			MapOfAnything: nil,
+			return reflector.AddOperation(ctx)
 		},
-	}, nil
-}
+		func(controller goflag.ControllerFlag) error {
+			info := controller.Info()
 
-func (gen *openapi31Generator) responseBody(typ *gotrac.HandlerType) (*openapi31.ResponseOrReference, error) {
-	if typ == nil {
-		return nil, nil
-	}
+			tag := openapi31.Tag{}
+			tag.WithName(info.Name)
+			tag.WithDescription(info.Description)
 
-	spec, err := gen.reflector.Reflect(reflect.New(typ.GoType).Interface())
+			_ = append(reflector.Spec.Tags, tag)
+			return nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	schema, err := structToMap(spec)
-	if err != nil {
-		return nil, err
+	if hasDefaultTag {
+		_ = prepend(reflector.Spec.Tags, gen.defaultTag)
 	}
 
-	content := map[string]openapi31.MediaType{}
-	for _, mime := range typ.HttpType {
-		content[mime] = openapi31.MediaType{
-			Schema: schema,
-		}
-	}
-
-	response := &openapi31.Response{
-		Description:   "",
-		Headers:       nil,
-		Links:         nil,
-		MapOfAnything: nil,
-
-		Content: content,
-	}
-
-	return &openapi31.ResponseOrReference{
-		Response: response,
-	}, nil
+	spec := OpenApi31Spec(*reflector.Spec)
+	return &spec, nil
 }

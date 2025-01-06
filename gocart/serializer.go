@@ -3,7 +3,7 @@ package gocart
 import (
 	"encoding/json"
 	"encoding/xml"
-	"github.com/benni-tec/gocart/gotrac"
+	"github.com/benni-tec/gocart/goflag"
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"reflect"
@@ -15,7 +15,7 @@ import (
 type Serializer[T any] interface {
 	Serialize(body *T, headers http.Header) ([]byte, error)
 	Deserialize(data []byte, headers http.Header) (*T, error)
-	Type() *gotrac.HandlerType
+	Type() *goflag.Type
 }
 
 // +++ JSON, YAML +++
@@ -65,8 +65,8 @@ func (j *MarshalSerializer[T]) Deserialize(data []byte, headers http.Header) (*T
 	return value, err
 }
 
-func (j *MarshalSerializer[T]) Type() *gotrac.HandlerType {
-	return &gotrac.HandlerType{
+func (j *MarshalSerializer[T]) Type() *goflag.Type {
+	return &goflag.Type{
 		GoType:   genericToType[T](),
 		HttpType: []string{"application/json"},
 	}
@@ -91,8 +91,8 @@ func (receiver *BinarySerializer) Deserialize(data []byte, headers http.Header) 
 	return &data, nil
 }
 
-func (receiver *BinarySerializer) Type() *gotrac.HandlerType {
-	return &gotrac.HandlerType{
+func (receiver *BinarySerializer) Type() *goflag.Type {
+	return &goflag.Type{
 		GoType:   reflect.TypeOf([]byte{}),
 		HttpType: receiver.contentType,
 	}

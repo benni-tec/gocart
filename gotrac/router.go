@@ -1,6 +1,7 @@
 package gotrac
 
 import (
+	"github.com/benni-tec/gocart/goflag"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 )
@@ -10,6 +11,11 @@ import (
 type Router interface {
 	http.Handler
 	chi.Routes
+
+	goflag.InformationFlag
+	WithInfo(fn func(info *goflag.Information)) Router
+
+	// +++ Router +++
 
 	// Use appends one or more middlewares onto the Router stack.
 	Use(middlewares ...func(http.Handler) http.Handler)
@@ -22,6 +28,7 @@ type Router interface {
 	Group(fn func(r Router)) Router
 
 	// Route mounts a sub-Router along a `pattern`` string.
+	// Returns the sub-Router
 	Route(pattern string, fn func(r Router)) Router
 
 	// Mount attaches another http.Handler along ./pattern/*
@@ -29,13 +36,15 @@ type Router interface {
 
 	// Handle and HandleFunc adds routes for `pattern` that matches
 	// all HTTP methods.
-	Handle(pattern string, h Handler) Route
+	Handle(pattern string, h http.Handler) Route
 	HandleFunc(pattern string, h http.HandlerFunc) Route
 
 	// Method and MethodFunc adds routes for `pattern` that matches
 	// the `method` HTTP method.
-	Method(method, pattern string, h Handler) Route
+	Method(method, pattern string, h http.Handler) Route
 	MethodFunc(method, pattern string, h http.HandlerFunc) Route
+
+	// TODO: add methods
 
 	// NotFound defines a handler to respond whenever a route could
 	// not be found.
@@ -44,8 +53,4 @@ type Router interface {
 	// MethodNotAllowed defines a handler to respond whenever a method is
 	// not allowed.
 	MethodNotAllowed(h http.HandlerFunc)
-
-	// ++++ Information ++++
-	Info() *RouterInformation
-	WithInfo(fn func(info *RouterInformation)) Router
 }

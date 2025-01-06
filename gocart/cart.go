@@ -1,6 +1,7 @@
 package gocart
 
 import (
+	"github.com/benni-tec/gocart/goflag"
 	"github.com/benni-tec/gocart/gotrac"
 	"github.com/benni-tec/gocart/middleware"
 	"io"
@@ -8,9 +9,9 @@ import (
 	"reflect"
 )
 
-// Cart represents a gotrac.Handler that automatically can (de)serialize the request/response
+// Cart represents a gotrac.EndpointFlag that automatically can (de)serialize the request/response
 type Cart interface {
-	gotrac.Handler
+	goflag.EndpointFlag
 	WithInfo(fn func(info *CartInformation)) Cart
 }
 
@@ -62,11 +63,11 @@ func A[TInput any, TOutput any](h CartFunc[TInput, TOutput]) Cart {
 	return IO[TInput, TOutput](nil, nil, h)
 }
 
-func (cart *cartImpl[TInput, TOutput]) Info() *gotrac.HandlerInformation {
+func (cart *cartImpl[TInput, TOutput]) Info() *goflag.EndpointInformation {
 	info := cart.info
 
-	handler := &gotrac.HandlerInformation{
-		Information: gotrac.Information{
+	handler := &goflag.EndpointInformation{
+		Information: goflag.Information{
 			Summary:     info.summary,
 			Description: info.description,
 		},
@@ -75,10 +76,14 @@ func (cart *cartImpl[TInput, TOutput]) Info() *gotrac.HandlerInformation {
 
 	if cart.input != nil {
 		handler.Input = cart.input.Type()
+	} else {
+		handler.Input = gotrac.None[TInput]()
 	}
 
 	if cart.output != nil {
 		handler.Output = cart.output.Type()
+	} else {
+		handler.Output = gotrac.None[TOutput]()
 	}
 
 	return handler
@@ -154,8 +159,12 @@ func (cart *cartImpl[TInput, TOutput]) decode(r *http.Request) (*TInput, error) 
 		decoders = append(decoders, factory(r))
 	}
 
-	val := reflect.ValueOf(input)
-	typ := genericToType[TInput]()
+	val := reflect.Indirect(reflect.ValueOf(input))
+	typ := val.Type()
+	if typ.Kind() != reflect.Struct {
+		return input, nil
+	}
+
 	for i := range typ.NumField() {
 		structField := typ.Field(i)
 		field := val.Field(i)
@@ -185,21 +194,26 @@ func (cart *cartImpl[TInput, TOutput]) encode(w http.ResponseWriter, output *TOu
 		encoders = append(encoders, factory(w))
 	}
 
-	val := reflect.ValueOf(output)
-	typ := genericToType[TInput]()
-	for i := range typ.NumField() {
-		structField := typ.Field(i)
-		field := val.Field(i)
+	if output != nil {
+		val := reflect.Indirect(reflect.ValueOf(output))
+		if val.IsZero() && val.Type().Kind() == reflect.Struct {
+			typ := val.Type()
 
-		for _, dec := range encoders {
-			err := dec.Encode(field, structField)
-			if err != nil {
-				return err
+			for i := range typ.NumField() {
+				structField := typ.Field(i)
+				field := val.Field(i)
+
+				for _, dec := range encoders {
+					err := dec.Encode(field, structField)
+					if err != nil {
+						return err
+					}
+				}
+
+				// TODO: add support for json tags, check constraints, ...
+				// https://pkg.go.dev/github.com/swaggest/jsonschema-go#Reflector.Reflect
 			}
 		}
-
-		// TODO: add support for json tags, check constraints, ...
-		// https://pkg.go.dev/github.com/swaggest/jsonschema-go#Reflector.Reflect
 	}
 
 	if cart.output != nil {
@@ -212,6 +226,8 @@ func (cart *cartImpl[TInput, TOutput]) encode(w http.ResponseWriter, output *TOu
 		if err != nil {
 			return err
 		}
+	} else {
+		w.WriteHeader(http.StatusNoContent)
 	}
 
 	return nil

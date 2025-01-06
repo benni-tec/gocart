@@ -6,8 +6,7 @@ import (
 )
 
 func genericToType[T any]() reflect.Type {
-	var array []T
-	return reflect.TypeOf(array).Elem()
+	return reflect.TypeOf(new(T))
 }
 
 func setHeader[T any](header http.Header, key string, values Serializer[T]) {

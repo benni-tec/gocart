@@ -23,27 +23,41 @@ While [swaggest](https://github.com/swaggest/rest) does what I need, I was missi
 - Support for serialization other than JSON, like Yaml or XML.
 
 ## Concept
-This project is split into 3 and a half parts:
-- `gotrac` - Router with meta-data information
-- `gocart` - Automatic (de)serialization for handlers
-- `gocrew` - Generate documentation
+This project is split into 4 and a half parts:
+- `goflag` - Provides the basic interfaces to read information from `chi.Routes`
+  - `InformationFlag` - Basic information, like summary and description, that is checked on all objects
+  - `HandlerFlag` - Handlers that can provide information about themselves
+  - `ControllerFlag` - Controller (i.e. `http.Handler | chi.Routes`), e.g. `chi.Router`
+- `gotrac` - Provides a `chi`-like Router to easily add information to endpoints using a fluent API
+- `gocart` - Builds upon `gotrac` to enable automatic (de)serialization for handlers
+- `gocrew` - Generate documentation using the data from `goflag`'s flags
 
-Both `gocart` and `gocrew` build upon `gotrac`, but not on each other! 
-`gotrac` contains all the information needed to generate documentation, `gocart.Cart` only implements the `gotrac.Handler` 
-with automatic (de)serialization but does not add more information for documentation that could not also be given directly to `gotrac`.
+
+- `middleware` - Middleware to catch errors
+
+Both `gotrac` and `gocrew` build upon `goflag`, but not on each other! 
+
+## <img src=".github/flag.png" style="height: 1em; position: relative; top: 0.15em"> `goflag`
+This package provides flags that can be implemented by a `http.Handler` to provide more information about itself.
+
+### `Information` & `InformationFlag`
+This is basic information that can be applied to many objects so it can be used when building the documentation.
+For example if the handler passed to a `gocrew.Generator` has the flag, the information will be used for the spec.
+
+### `EndpointInformation` & `EndpointFlag`
+This is information specific for endpoints, i.e. the function that actually handles and returns some data.
+Therefore, the `EndpointFlag` can be used to mark a handler as an `Endpoint`.
+
+### `ControllerInformation` & `ControllerFlag`
+A controller can be any `http.Handler` that has sub-routes, i.e. implements `chi.Routes`. 
+These handlers can be flagged to provide information about themselves, 
+notably their name which is then used to group all the endpoints beneath the controller.
 
 ## <img src=".github/race-track.png" style="height: 1em; position: relative; top: 0.15em"> `gotrac`
 This package provides a fully `net/http` compatible router, i.e. the `Router` itself is a `http.Handler`
 and it follows the middleware standard.
 
-The API is similar to `chi.Router` however it is not compatible, requiring a `gotrac.Handler` instead of a simple `http.Handler`.
-The main difference is, that the `gotrac.Handler` can provide a `HandlerInformation` struct which is the used to construct the `gotrac.Route`.
-
-While the `gotrac.Handler` is just an interface that you can implement arbitrarily, 
-`gotrac.Route` represents a handler that was registered to a `gotrac.Router` and has editable information.
-Basically it only wraps the actual `http.Handler` and copies the information.
-
-We also provide a fluent-ish API to modify/set information:
+The API is similar to `chi.Router` however it is not compatible, instead offering a fluent API to add information:
 
 ```go
 package main
@@ -105,7 +119,7 @@ import (
 )
 
 func main() {
-	gen := gocrew.OpenApi31()
+	gen := gocrew.OpenApi31("Title of the API", nil)
 	router := gotrac.Default().WithInfo(func(info *gotrac.RouterInformation) {
 		info.WithSummary("Fotobox Firmware (Backend)").
 			WithDescription("some kind of description")
@@ -135,7 +149,6 @@ func pong(writer http.ResponseWriter, _ *http.Request) {
 type PongResponse struct {
 	Pong bool `json:"pong"`
 }
-
 ```
 
 ## <img src=".github/gokart.png" style="height: 1em; position: relative; top: 0.15em"> `gocart`

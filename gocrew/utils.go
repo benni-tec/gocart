@@ -1,20 +1,13 @@
 package gocrew
 
-import (
-	"encoding/json"
-)
+func prepend[T any](array []T, value T) []T {
+	array = append(array, *new(T))
+	copy(array[1:], array)
+	array[0] = value
+	return array
+}
 
-func structToMap(obj any) (map[string]any, error) {
-	str, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	var mp map[string]any
-	err = json.Unmarshal(str, &mp)
-	if err != nil {
-		return nil, err
-	}
-
-	return mp, nil
+// P wraps the value to a pointer
+func P[T any](v T) *T {
+	return &v
 }

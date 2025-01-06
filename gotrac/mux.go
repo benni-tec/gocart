@@ -1,6 +1,7 @@
 package gotrac
 
 import (
+	"github.com/benni-tec/gocart/goflag"
 	middleware2 "github.com/benni-tec/gocart/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -10,7 +11,7 @@ import (
 // Mux implements the Router using a chi.Router
 type Mux struct {
 	router chi.Router
-	info   RouterInformation
+	info   goflag.Information
 }
 
 // Default creates a new Router and adds common middlewares, that should be present on the root router
@@ -90,7 +91,7 @@ func (m *Mux) Mount(pattern string, h http.Handler) {
 	m.router.Mount(pattern, h)
 }
 
-func (m *Mux) Handle(pattern string, h Handler) Route {
+func (m *Mux) Handle(pattern string, h http.Handler) Route {
 	actor := wrapToHandler(h)
 	m.router.Handle(pattern, actor)
 	return actor
@@ -102,7 +103,7 @@ func (m *Mux) HandleFunc(pattern string, h http.HandlerFunc) Route {
 	return actor
 }
 
-func (m *Mux) Method(method, pattern string, h Handler) Route {
+func (m *Mux) Method(method, pattern string, h http.Handler) Route {
 	actor := wrapToHandler(h)
 	m.router.Method(method, pattern, actor)
 	return actor
@@ -124,11 +125,11 @@ func (m *Mux) MethodNotAllowed(h http.HandlerFunc) {
 
 // +++ Information +++
 
-func (m *Mux) Info() *RouterInformation {
+func (m *Mux) Info() *goflag.Information {
 	return &m.info
 }
 
-func (m *Mux) WithInfo(fn func(info *RouterInformation)) Router {
+func (m *Mux) WithInfo(fn func(info *goflag.Information)) Router {
 	if fn != nil {
 		fn(&m.info)
 	}
